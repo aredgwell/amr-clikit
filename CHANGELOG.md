@@ -6,19 +6,27 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-05-25
+
 ### Added
 
-- MIT license, `py.typed` typing marker, and packaging metadata (classifiers,
-  keywords, URLs) for public release.
-- ruff lint + format configuration, pyright type-checking, `pytest-cov`, and a
-  Python 3.12 / 3.13 CI matrix.
-- Contract test suite covering log routing, JSON formatting, level filtering,
-  and the `AMR_LOG_LEVEL` override.
+- `CliError` and `run_cli` for a consistent error/exit-code contract: expected
+  errors become a stderr message + exit code, `KeyboardInterrupt` → 130, and
+  unexpected errors → exit 1 with the traceback shown only under `-v`.
+- `confirm` for interactive confirmation that stays safe in non-interactive
+  contexts (returns `False` without a TTY).
+- Tabular `emit` output — a list of dicts renders as an aligned table in text
+  mode.
+- Optional `typer` extra (`amr_clikit.cli`): `build_app` (pre-wires
+  `-v`/`--quiet`/`--version` and logging) plus reusable `OUTPUT_OPTION` and
+  `YES_OPTION`.
+- MIT license, `py.typed` marker, and packaging metadata for public release.
+- ruff lint + format, pyright, `pytest-cov`, and a Python 3.12 / 3.13 CI matrix.
 
 ### Changed
 
 - Renamed the internal `logging` module to `log` to avoid shadowing the stdlib
-  (public API via `amr_clikit` is unchanged).
+  (public API unchanged).
 
 ## [0.1.0] - 2026-05-25
 

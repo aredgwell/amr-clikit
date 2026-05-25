@@ -23,6 +23,10 @@ import structlog
 
 _VERBOSITY_LEVELS = ["WARNING", "INFO", "DEBUG"]
 
+# Resolved level of the most recent configure_logging() call; used by run_cli to
+# decide whether to surface a traceback for unexpected errors.
+_LEVEL = logging.INFO
+
 
 def level_for_verbosity(verbose: int = 0, quiet: bool = False) -> str:
     """Map repeated -v / --quiet flags to a level name.
@@ -42,6 +46,8 @@ def _resolve_level(level: str | None) -> int:
 
 def configure_logging(*, cli_name: str, version: str, level: str | None = None) -> None:
     """Configure structlog process-wide. Call once, in the root command."""
+    global _LEVEL
+    _LEVEL = _resolve_level(level)
     use_json = not sys.stderr.isatty()
     no_color = bool(os.environ.get("NO_COLOR"))
 
@@ -60,12 +66,17 @@ def configure_logging(*, cli_name: str, version: str, level: str | None = None) 
 
     structlog.configure(
         processors=processors,
-        wrapper_class=structlog.make_filtering_bound_logger(_resolve_level(level)),
+        wrapper_class=structlog.make_filtering_bound_logger(_LEVEL),
         logger_factory=structlog.PrintLoggerFactory(file=sys.stderr),
         cache_logger_on_first_use=True,
     )
     structlog.contextvars.clear_contextvars()
     structlog.contextvars.bind_contextvars(cli=cli_name, version=version)
+
+
+def is_debug() -> bool:
+    """True if the active log level is DEBUG or lower (i.e. -v was given)."""
+    return _LEVEL <= logging.DEBUG
 
 
 def get_logger(*args, **kwargs):

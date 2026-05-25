@@ -1,6 +1,6 @@
 [project]
 name = "amr-clikit"
-version = "0.1.0"
+version = "0.2.0"
 description = "Shared CLI toolkit: structured logging and stdout/stderr discipline for Python CLIs."
 readme = "README.md"
 requires-python = ">=3.12"
@@ -27,11 +27,16 @@ Repository = "https://github.com/aredgwell/amr-clikit"
 Issues = "https://github.com/aredgwell/amr-clikit/issues"
 
 [project.optional-dependencies]
+# Typer glue (amr_clikit.cli); the core needs no CLI framework.
+typer = [
+    "typer>=0.12",
+]
 dev = [
     "ruff>=0.6",
     "pyright>=1.1.380",
     "pytest>=8.0",
     "pytest-cov>=5.0",
+    "typer>=0.12",
 ]
 
 [build-system]
