@@ -31,3 +31,28 @@ def test_command_honours_output_option() -> None:
     result = runner.invoke(_make_app(), ["items", "--output", "json"])
     assert result.exit_code == 0
     assert '"a": 1' in result.stdout
+
+
+def test_command_alias_resolves() -> None:
+    app = build_app(cli_name="demo", version="0")
+
+    @app.command("list | ls")
+    def list_items() -> None:
+        emit(["x"], output="text")
+
+    canonical = runner.invoke(app, ["list"])
+    alias = runner.invoke(app, ["ls"])
+    assert canonical.exit_code == 0
+    assert alias.exit_code == 0
+    assert alias.stdout == canonical.stdout == "x\n"
+
+
+def test_unknown_command_still_errors() -> None:
+    app = build_app(cli_name="demo", version="0")
+
+    @app.command("list | ls")
+    def list_items() -> None:
+        emit(["x"], output="text")
+
+    result = runner.invoke(app, ["nope"])
+    assert result.exit_code != 0

@@ -6,6 +6,15 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-05-26
+
+### Added
+
+- `AliasGroup` (in `amr_clikit.cli`) and `build_app` wiring for command aliases:
+  name a command or mounted sub-app with `|`/`,`-separated aliases
+  (`@app.command("list | ls")`, `add_typer(plugin, name="harness | h")`) and any
+  of them resolves. Non-breaking — names without a separator are unchanged.
+
 ## [0.2.0] - 2026-05-25
 
 ### Added

@@ -17,9 +17,9 @@ depends only on [structlog](https://www.structlog.org/).
 
 ```bash
 # core only
-uv add "amr-clikit @ git+https://github.com/aredgwell/amr-clikit.git@v0.2.0"
+uv add "amr-clikit @ git+https://github.com/aredgwell/amr-clikit.git@v0.3.0"
 # with the Typer glue (build_app + shared options)
-uv add "amr-clikit[typer] @ git+https://github.com/aredgwell/amr-clikit.git@v0.2.0"
+uv add "amr-clikit[typer] @ git+https://github.com/aredgwell/amr-clikit.git@v0.3.0"
 ```
 
 ## API
@@ -68,6 +68,20 @@ def run() -> None:  # console_scripts entry point
 Errors are reported consistently: `CliError` → its message on stderr and its
 exit code; `KeyboardInterrupt` → 130; anything unexpected → exit 1 with the
 traceback shown only under `-v`.
+
+### Command aliases
+
+Apps built with `build_app` accept `|`- or `,`-separated aliases in a command
+(or mounted sub-app) name — any of them resolves, and help shows them together:
+
+```python
+@app.command("list | ls")
+def list_items() -> None: ...
+
+app.add_typer(plugin, name="harness | h")  # `mycli h …` -> `mycli harness …`
+```
+
+A name without a separator behaves exactly as before.
 
 ## Development
 
