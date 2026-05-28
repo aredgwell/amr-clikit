@@ -27,6 +27,12 @@ def test_version_flag_prints_version() -> None:
     assert "1.2.3" in result.stdout
 
 
+def test_version_command_prints_version() -> None:
+    result = runner.invoke(_make_app(), ["version"])
+    assert result.exit_code == 0
+    assert "1.2.3" in result.stdout
+
+
 def test_command_honours_output_option() -> None:
     result = runner.invoke(_make_app(), ["items", "--output", "json"])
     assert result.exit_code == 0

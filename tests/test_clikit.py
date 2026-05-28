@@ -38,7 +38,12 @@ def _log_records(capsys: pytest.CaptureFixture[str]) -> list[dict]:
 
 @pytest.mark.parametrize(
     ("verbose", "quiet", "expected"),
-    [(0, False, "INFO"), (1, False, "DEBUG"), (2, False, "DEBUG"), (0, True, "ERROR")],
+    [
+        (0, False, "WARNING"),
+        (1, False, "INFO"),
+        (2, False, "DEBUG"),
+        (0, True, "ERROR"),
+    ],
 )
 def test_level_for_verbosity(verbose: int, quiet: bool, expected: str) -> None:
     assert level_for_verbosity(verbose=verbose, quiet=quiet) == expected
@@ -134,7 +139,7 @@ def test_run_cli_unexpected_error_is_1_without_traceback(
 
 
 def test_logs_to_stderr_as_json_with_bound_context(capsys: pytest.CaptureFixture[str]) -> None:
-    configure_logging(cli_name="t", version="9.9.9")
+    configure_logging(cli_name="t", version="9.9.9", level="INFO")
     get_logger().info("hello", count=2)
     captured = capsys.readouterr()
     assert captured.out == ""  # results channel left untouched
@@ -145,6 +150,14 @@ def test_logs_to_stderr_as_json_with_bound_context(capsys: pytest.CaptureFixture
     assert record["cli"] == "t"
     assert record["version"] == "9.9.9"
     assert "timestamp" in record
+
+
+def test_default_level_filters_info(capsys: pytest.CaptureFixture[str]) -> None:
+    configure_logging(cli_name="t", version="0")
+    log = get_logger()
+    log.info("hidden")
+    log.warning("shown")
+    assert [r["event"] for r in _log_records(capsys)] == ["shown"]
 
 
 def test_info_level_filters_debug(capsys: pytest.CaptureFixture[str]) -> None:
@@ -179,3 +192,15 @@ def test_explicit_level_beats_env(
     configure_logging(cli_name="t", version="0", level="DEBUG")
     get_logger().debug("kept")
     assert [r["event"] for r in _log_records(capsys)] == ["kept"]
+
+
+def test_console_logs_are_concise(monkeypatch: pytest.MonkeyPatch) -> None:
+    class TtyStringIO(io.StringIO):
+        def isatty(self) -> bool:
+            return True
+
+    err = TtyStringIO()
+    monkeypatch.setattr(sys, "stderr", err)
+    configure_logging(cli_name="demo", version="1.2.3", level="INFO")
+    get_logger().info("listing labs", count=0)
+    assert err.getvalue() == "listing labs count=0\n"

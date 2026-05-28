@@ -6,6 +6,22 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-05-28
+
+### Added
+
+- `version` subcommand in `build_app` CLIs, matching the documented CLI
+  convention alongside `--version`.
+
+### Changed
+
+- Console diagnostics are quiet by default (`WARNING`), with `-v` for info and
+  `-vv` for debug.
+- TTY diagnostics render as concise message lines rather than timestamped
+  structured records.
+- The `typer` extra now explicitly includes `click`, matching
+  `amr_clikit.cli` imports.
+
 ## [0.3.0] - 2026-05-26
 
 ### Added

@@ -82,7 +82,7 @@ def build_app(*, cli_name: str, version: str, **kwargs: Any) -> typer.Typer:
         verbose: int = typer.Option(
             0, "-v", "--verbose", count=True, help="Increase log verbosity; repeat for debug."
         ),
-        quiet: bool = typer.Option(False, "--quiet", help="Suppress info logs."),
+        quiet: bool = typer.Option(False, "--quiet", help="Suppress warning and info logs."),
         _version: bool = typer.Option(
             False, "--version", callback=_show_version, is_eager=True, help="Show version and exit."
         ),
@@ -90,5 +90,10 @@ def build_app(*, cli_name: str, version: str, **kwargs: Any) -> typer.Typer:
         configure_logging(
             cli_name=cli_name, version=version, level=level_for_verbosity(verbose, quiet)
         )
+
+    @app.command("version")
+    def version_cmd() -> None:
+        """Show version and exit."""
+        typer.echo(version)
 
     return app
