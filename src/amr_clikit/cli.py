@@ -24,6 +24,7 @@ OUTPUT_OPTION = typer.Option("text", "--output", help="Output format: text or js
 YES_OPTION = typer.Option(False, "--yes", "-y", help="Skip confirmation prompts.")
 
 _ALIAS_SPLIT = re.compile(r"\s*[,|]\s*")
+_DEFAULT_CONTEXT_SETTINGS = {"max_content_width": 100}
 
 
 class AliasGroup(TyperGroup):
@@ -70,6 +71,7 @@ def build_app(*, cli_name: str, version: str, **kwargs: Any) -> typer.Typer:
     """
     kwargs.setdefault("no_args_is_help", True)
     kwargs.setdefault("cls", AliasGroup)
+    kwargs.setdefault("context_settings", _DEFAULT_CONTEXT_SETTINGS)
     app = typer.Typer(**kwargs)
 
     def _show_version(value: bool) -> None:
