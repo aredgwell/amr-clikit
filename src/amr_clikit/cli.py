@@ -37,7 +37,7 @@ class AliasGroup(TyperGroup):
         @app.command("list | ls")
         def list_items() -> None: ...
 
-        app.add_typer(plugin, name="harness | h")  # `amr h` -> `amr harness`
+        app.add_typer(plugin, name="learn | l")  # `amr l` -> `amr learn`
 
     `build_app` uses this group by default, so any CLI built on amr-clikit gets
     aliases with no extra wiring. A command without a separator behaves exactly
