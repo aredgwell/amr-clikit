@@ -10,7 +10,6 @@ from __future__ import annotations
 import re
 from typing import Any
 
-import click
 import typer
 from typer.core import TyperGroup
 
@@ -37,14 +36,14 @@ class AliasGroup(TyperGroup):
         @app.command("list | ls")
         def list_items() -> None: ...
 
-        app.add_typer(plugin, name="harness | h")  # `amr h` -> `amr harness`
+        app.add_typer(plugin, name="learn | l")  # `amr l` -> `amr learn`
 
     `build_app` uses this group by default, so any CLI built on amr-clikit gets
     aliases with no extra wiring. A command without a separator behaves exactly
     as before (non-breaking).
     """
 
-    def get_command(self, ctx: click.Context, cmd_name: str) -> click.Command | None:
+    def get_command(self, ctx: Any, cmd_name: str) -> Any:
         return super().get_command(ctx, self._canonical(cmd_name))
 
     def _canonical(self, name: str) -> str:
