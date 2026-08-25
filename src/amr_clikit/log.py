@@ -24,7 +24,9 @@ from typing import Any
 import structlog
 
 _VERBOSITY_LEVELS = ["WARNING", "INFO", "DEBUG"]
-_CONSOLE_RESERVED_KEYS = {"event", "level", "timestamp", "cli", "version"}
+# `exit_code` is reserved rather than rendered: a structured reader wants it on
+# the record, and a person reading the terminal already gets it from the shell.
+_CONSOLE_RESERVED_KEYS = {"event", "level", "timestamp", "cli", "version", "exit_code"}
 
 # One stream, so one lock: keeps a message and its newline together when a CLI
 # logs from more than one thread.

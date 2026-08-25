@@ -30,7 +30,8 @@ backwards-compatible API changes and add tests for behaviour, not only helpers.
 - Keep console output readable by default. Routine `info` diagnostics should not
   appear unless verbosity asks for them.
 - Treat `CliError`, `emit`, `run_cli`, `configure_logging`, `get_logger`,
-  `build_app` and `AliasGroup` as public API. `AliasGroup` is subclassed
+  `build_app`, `command_tree`, `AliasGroup` and `amr_clikit.testing` as public
+  API. `AliasGroup` is subclassed
   downstream — `amr` extends it for sibling dispatch — so its `get_command`,
   `invoke`, `shell_complete` and `list_commands` are an extension point, not
   internals.

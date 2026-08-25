@@ -6,6 +6,66 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-08-25
+
+Making a CLI built here legible to an agent by default, rather than each
+consumer solving it separately.
+
+### Added
+
+- **`command_tree(app)` and a `commands` subcommand**, registered by `build_app`
+  unless `commands_command=False`. Every command in a clikit CLI emits
+  `--output json` on request; the one thing that could not was the command
+  surface itself, so finding out what a CLI offered meant parsing Typer's rich
+  help — box-drawing glyphs that break byte-oriented tools, and text reflowed to
+  whatever `COLUMNS` happens to be, so the same command produces different bytes
+  in different terminals.
+
+  One row per leaf command, with `command` the spelling to prefer and `aliases`
+  a separate list, so nothing puts a string like `list | ls` where a caller
+  might type it. Sub-apps flatten to `"parent child"` — a row is a complete
+  invocation — and every combination of spellings that resolves is listed, not
+  one per level. Derived from the live tree, so it cannot fall behind.
+
+  `version` is included: it is a real command, and a consumer that wants an
+  affordance list rather than a command list can drop it more easily than it
+  could add it back.
+- **`amr_clikit.testing.assert_agent_ready(app)`** — one importable assertion a
+  CLI runs against its own tree: every command's `--help` renders, every alias
+  `command_tree` publishes actually resolves, every command taking `--output`
+  produces parseable JSON, and none of them writes its result anywhere but
+  stdout. Each check corresponds to a defect that shipped in a real CLI here and
+  was found by hand. It patches `os.execvp` for the duration, because a CLI that
+  dispatches to a sibling binary would otherwise replace the test process when
+  its help is requested — a truncated run that looks exactly like a green one.
+- **`CliError.usage(message)`** — a `CliError` with exit code 2, and the
+  exit-code convention written down where the class is defined. `2` means *you
+  called this wrong*, `1` means *it ran and found a problem*. That is the
+  distinction a caller deciding whether to retry needs, and the default being
+  `1` made the caller-error case the one that had to be remembered.
+
+### Fixed
+
+- **A mounted sub-app resolves its own aliases without wiring.**
+  `add_typer(sub, name="workspace | ws")` builds `sub`'s group from `sub`'s own
+  class, which is a plain `TyperGroup` unless the caller remembered
+  `cls=AliasGroup` — so `workspace` and `ws` resolved, and `workspace show`,
+  declared `"show | s"` inside `sub`, did not. Help advertised the alias and
+  nothing honoured it, and every consumer worked around it by passing `cls=` on
+  every sub-app it mounted. A group reached through an `AliasGroup` now resolves
+  aliases the same way. `AliasGroup` specifically, not the root's own class: a
+  root group that adds behaviour of its own means it for the root.
+
+  Found by `assert_agent_ready` on its first run, which is the argument for it.
+
+### Changed
+
+- A `CliError` now carries `exit_code` on the log record. Stderr is already JSON
+  when it is not a TTY, so a caller capturing it can read the failure
+  structurally instead of parsing prose plus reading the process exit status.
+  The console renderer reserves the key, so a person still sees the message
+  alone.
+
 ## [0.5.0] - 2026-08-25
 
 ### Fixed
