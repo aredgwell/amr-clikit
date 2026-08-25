@@ -18,9 +18,9 @@ depends only on [structlog](https://www.structlog.org/).
 
 ```bash
 # core only
-uv add "amr-clikit @ git+https://github.com/aredgwell/amr-clikit.git@v0.3.1"
+uv add "amr-clikit @ git+https://github.com/aredgwell/amr-clikit.git@v0.4.0"
 # with the Typer glue (build_app + shared options)
-uv add "amr-clikit[typer] @ git+https://github.com/aredgwell/amr-clikit.git@v0.3.1"
+uv add "amr-clikit[typer] @ git+https://github.com/aredgwell/amr-clikit.git@v0.4.0"
 ```
 
 ## API
@@ -32,12 +32,16 @@ Core (no CLI-framework dependency):
 | `configure_logging(cli_name, version, level=None)` | Configure logging once, in the root command. JSON when piped, concise console messages on a TTY; level from `level` / `AMR_LOG_LEVEL` / `WARNING`. |
 | `get_logger()` | A bound structlog logger (diagnostics → stderr). |
 | `level_for_verbosity(verbose=0, quiet=False)` | Map `-v` count / `--quiet` to a level name. |
-| `emit(data, output="text"\|"json")` | Write a result to stdout. A list of dicts renders as an aligned table in text mode. |
+| `emit(data, output="text"\|"json")` | Write a result to stdout. A list of dicts renders as an aligned table in text mode (single-line cells; no trailing whitespace). |
 | `confirm(prompt, assume_yes=False)` | Confirmation prompt; returns `False` in non-interactive contexts. |
 | `CliError(message, exit_code=1)` | Raise for expected, user-facing failures. |
 | `run_cli(entry)` | Run an entry point with the standard error/exit-code contract. |
 
-Typer glue (`amr_clikit.cli`, needs the `typer` extra): `build_app(cli_name, version)`, `OUTPUT_OPTION`, `YES_OPTION`.
+Typer glue (`amr_clikit.cli`, needs the `typer` extra):
+`build_app(cli_name, version, version_command=True)`, `AliasGroup`,
+`OUTPUT_OPTION`, `YES_OPTION`. Pass `version_command=False` to omit the
+`version` subcommand — `--version` stays — when something enumerates the
+command tree.
 
 ## Usage
 
@@ -68,7 +72,12 @@ def run() -> None:  # console_scripts entry point
 
 Errors are reported consistently: `CliError` → its message on stderr and its
 exit code; `KeyboardInterrupt` → 130; anything unexpected → exit 1 with the
-traceback shown only under `-v`.
+traceback shown only under `-vv`.
+
+`CliError` reaches its exit code by both routes. `run_cli` is the outer
+boundary, and apps built by `build_app` also map it in the group itself — so a
+test driving the app with `typer.testing.CliRunner`, which never goes through
+`run_cli`, sees the same exit code the installed binary gives.
 
 ### Command aliases
 
@@ -82,7 +91,16 @@ def list_items() -> None: ...
 app.add_typer(plugin, name="harness | h")  # `mycli h …` -> `mycli harness …`
 ```
 
-A name without a separator behaves exactly as before.
+A name without a separator behaves exactly as before. Shell completion offers
+each alias as its own candidate (`list` and `ls`, not `list | ls`).
+
+### Tables are single-line
+
+`emit`'s table is for tabular data: one value per cell, on one line. A cell
+holding a newline is not a cell — the second line starts at column zero and
+every column after it is meaningless. Data that is multi-line by nature, such as
+captured tool output with one line per package, wants its own sectioned
+rendering rather than this table.
 
 ## Development
 
