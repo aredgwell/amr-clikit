@@ -78,6 +78,14 @@ def test_emit_text_table_of_dicts(capsys: pytest.CaptureFixture[str]) -> None:
     assert lines[3].split() == ["bb", "22"]
 
 
+def test_emit_table_has_no_trailing_whitespace(capsys: pytest.CaptureFixture[str]) -> None:
+    """Padding the final column puts trailing space on every header and short row."""
+    emit([{"name": "a", "note": "long note"}, {"name": "bb", "note": "x"}], output="text")
+    lines = capsys.readouterr().out.splitlines()
+    assert lines == [line.rstrip() for line in lines]
+    assert lines[0] == "name  note"
+
+
 def test_emit_text_dict_as_kv(capsys: pytest.CaptureFixture[str]) -> None:
     emit({"a": 1, "b": 2}, output="text")
     assert capsys.readouterr().out == "a: 1\nb: 2\n"
@@ -132,7 +140,8 @@ def test_run_cli_unexpected_error_is_1_without_traceback(
     err = capsys.readouterr().err
     assert "unexpected error" in err
     assert "kaboom" in err
-    assert "Traceback" not in err  # no traceback unless -v
+    assert "Traceback" not in err  # no traceback below DEBUG
+    assert "-vv" in err  # the hint names the level that actually shows one
 
 
 # --- logging contract ------------------------------------------------------
@@ -192,6 +201,45 @@ def test_explicit_level_beats_env(
     configure_logging(cli_name="t", version="0", level="DEBUG")
     get_logger().debug("kept")
     assert [r["event"] for r in _log_records(capsys)] == ["kept"]
+
+
+def test_module_level_logger_follows_a_replaced_stream(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A logger held from before configure_logging writes to stderr *now*.
+
+    `log = get_logger()` at module scope is the documented idiom. Binding the
+    stream at configure time made it write to a stale stderr for the life of
+    the process — under CliRunner, one the runner had already closed.
+    """
+    module_log = get_logger()
+
+    first = io.StringIO()
+    monkeypatch.setattr(sys, "stderr", first)
+    configure_logging(cli_name="t", version="0")
+    module_log.warning("one")
+
+    second = io.StringIO()
+    monkeypatch.setattr(sys, "stderr", second)
+    configure_logging(cli_name="t", version="0")
+    module_log.warning("two")
+
+    assert [json.loads(line)["event"] for line in first.getvalue().splitlines()] == ["one"]
+    assert [json.loads(line)["event"] for line in second.getvalue().splitlines()] == ["two"]
+
+
+def test_module_level_logger_follows_a_reconfigured_level(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """The same staleness in a second place: a cached logger froze the level."""
+    module_log = get_logger()
+
+    configure_logging(cli_name="t", version="0")  # WARNING
+    module_log.info("hidden")
+    configure_logging(cli_name="t", version="0", level="INFO")
+    module_log.info("shown")
+
+    assert [r["event"] for r in _log_records(capsys)] == ["shown"]
 
 
 def test_console_logs_are_concise(monkeypatch: pytest.MonkeyPatch) -> None:
