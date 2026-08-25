@@ -5,7 +5,7 @@ from __future__ import annotations
 import typer
 from typer.testing import CliRunner
 
-from amr_clikit import OutputFormat, emit
+from amr_clikit import CliError, OutputFormat, emit
 from amr_clikit.cli import OUTPUT_OPTION, build_app
 
 runner = CliRunner()
@@ -62,3 +62,71 @@ def test_unknown_command_still_errors() -> None:
 
     result = runner.invoke(app, ["nope"])
     assert result.exit_code != 0
+
+
+def _completions(app: typer.Typer, incomplete: str) -> list[str]:
+    """Drive the group's completion the way a shell does, via `shell_complete`."""
+    group = typer.main.get_command(app)
+    ctx = group.make_context("demo", [], resilient_parsing=True)
+    return [item.value for item in group.shell_complete(ctx, incomplete)]
+
+
+def _alias_app() -> typer.Typer:
+    app = build_app(cli_name="demo", version="0")
+
+    @app.command("list | ls")
+    def list_items() -> None:
+        """List the items."""
+
+    sub = typer.Typer()
+
+    @sub.command("run")
+    def sub_run() -> None: ...
+
+    app.add_typer(sub, name="harness | h")
+    return app
+
+
+def test_completion_offers_each_alias_separately() -> None:
+    """The registered name `list | ls` is not a command; both spellings are."""
+    assert _completions(_alias_app(), "l") == ["list", "ls"]
+
+
+def test_completion_matches_an_alias_prefix() -> None:
+    assert _completions(_alias_app(), "ls") == ["ls"]
+
+
+def test_completion_expands_a_mounted_sub_app_name() -> None:
+    assert _completions(_alias_app(), "h") == ["harness", "h"]
+
+
+def test_completion_still_offers_options() -> None:
+    assert _completions(_alias_app(), "--qu") == ["--quiet"]
+
+
+def test_completion_offers_nothing_for_an_unknown_prefix() -> None:
+    assert _completions(_alias_app(), "nope") == []
+
+
+def test_clierror_exit_code_survives_clirunner() -> None:
+    """`run_cli` is the console-script path; a test drives the app directly."""
+    app = build_app(cli_name="demo", version="0")
+
+    @app.command()
+    def boom() -> None:
+        raise CliError("nope", exit_code=3)
+
+    result = runner.invoke(app, ["boom"])
+    assert result.exit_code == 3
+
+
+def test_version_command_can_be_suppressed() -> None:
+    """`--version` stays; the subcommand goes, for trees that get enumerated."""
+    app = build_app(cli_name="demo", version="1.2.3", version_command=False)
+
+    @app.command()
+    def items() -> None: ...
+
+    assert _completions(app, "") == ["items"]
+    assert runner.invoke(app, ["version"]).exit_code != 0
+    assert "1.2.3" in runner.invoke(app, ["--version"]).stdout
