@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import typer
 from typer.testing import CliRunner
 
 from amr_clikit import CliError, OutputFormat, emit
-from amr_clikit.cli import OUTPUT_OPTION, build_app
+from amr_clikit.cli import OUTPUT_OPTION, AliasGroup, build_app
 
 runner = CliRunner()
 
@@ -130,3 +132,29 @@ def test_version_command_can_be_suppressed() -> None:
     assert _completions(app, "") == ["items"]
     assert runner.invoke(app, ["version"]).exit_code != 0
     assert "1.2.3" in runner.invoke(app, ["--version"]).stdout
+
+
+def test_completion_does_not_duplicate_a_subclass_extra_command() -> None:
+    """A group may list more commands than it registers — each is offered once.
+
+    `amr`'s root group appends declared sibling binaries to `list_commands`, so
+    filtering the base class's own candidates against `self.commands` would
+    have let those through a second time.
+    """
+
+    class RootGroup(AliasGroup):
+        def list_commands(self, ctx: Any) -> list[str]:
+            return [*super().list_commands(ctx), "publish"]
+
+        def get_command(self, ctx: Any, cmd_name: str) -> Any:
+            if cmd_name == "publish":
+                return typer.main.get_command(build_app(cli_name="p", version="0"))
+            return super().get_command(ctx, cmd_name)
+
+    app = build_app(cli_name="demo", version="0", version_command=False, cls=RootGroup)
+
+    @app.command("list | ls")
+    def list_items() -> None: ...
+
+    assert _completions(app, "") == ["list", "ls", "publish"]
+    assert _completions(app, "pub") == ["publish"]

@@ -6,6 +6,16 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-08-25
+
+### Fixed
+
+- Alias completion no longer offers a command twice in a group that lists more
+  commands than it registers. `amr`'s root group appends declared sibling
+  binaries to `list_commands`; 0.4.0 filtered the base class's own candidates
+  against `self.commands`, so those siblings came through a second time.
+  Filtering against `list_commands` covers both. Found while adopting 0.4.0.
+
 ## [0.4.0] - 2026-08-25
 
 Two defects found while adopting 0.3.1 in `amr-agent-toolchain` and

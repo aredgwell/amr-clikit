@@ -90,11 +90,14 @@ class AliasGroup(TyperGroup):
             for alias in _ALIAS_SPLIT.split(item.value)
             if alias.startswith(incomplete)
         ]
-        # Options and anything else the base class offers for this prefix;
-        # commands are already covered above, under every spelling.
-        registered = set(self.commands)
+        # Options and anything else the base class offers for this prefix.
+        # Everything the group *lists* is already covered above, under every
+        # spelling — `list_commands` rather than `self.commands`, because a
+        # subclass may list more than it registers (a root group dispatching to
+        # sibling binaries, say).
+        listed = set(self.list_commands(ctx))
         candidates.extend(
-            item for item in super().shell_complete(ctx, incomplete) if item.value not in registered
+            item for item in super().shell_complete(ctx, incomplete) if item.value not in listed
         )
         return candidates
 
