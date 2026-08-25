@@ -18,9 +18,9 @@ depends only on [structlog](https://www.structlog.org/).
 
 ```bash
 # core only
-uv add "amr-clikit @ git+https://github.com/aredgwell/amr-clikit.git@v0.4.1"
+uv add "amr-clikit @ git+https://github.com/aredgwell/amr-clikit.git@v0.5.0"
 # with the Typer glue (build_app + shared options)
-uv add "amr-clikit[typer] @ git+https://github.com/aredgwell/amr-clikit.git@v0.4.1"
+uv add "amr-clikit[typer] @ git+https://github.com/aredgwell/amr-clikit.git@v0.5.0"
 ```
 
 ## API
@@ -92,7 +92,10 @@ app.add_typer(plugin, name="harness | h")  # `mycli h …` -> `mycli harness …
 ```
 
 A name without a separator behaves exactly as before. Shell completion offers
-each alias as its own candidate (`list` and `ls`, not `list | ls`).
+each alias as its own candidate (`list` and `ls`, not `list | ls`), and anywhere
+a command is *named back* to the caller — the help table, the usage line, the
+"did you mean" on a typo — it is named canonically, so what you are told to type
+is something that runs.
 
 ### Tables are single-line
 
