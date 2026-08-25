@@ -9,7 +9,7 @@ stdout/stderr discipline, structured logging setup, concise console rendering,
 Typer glue, command aliases, common options, confirmation prompts, and expected
 error handling.
 
-Changes here fan out to `amr-cli` and component CLIs, so prefer small,
+Changes here fan out to every `amr-*` command, so prefer small,
 backwards-compatible API changes and add tests for behaviour, not only helpers.
 
 ## Start here
@@ -29,8 +29,11 @@ backwards-compatible API changes and add tests for behaviour, not only helpers.
   stderr, JSON when requested or when logs are piped.
 - Keep console output readable by default. Routine `info` diagnostics should not
   appear unless verbosity asks for them.
-- Treat `CliError`, `emit`, `run_cli`, `configure_logging`, and `build_app` as
-  public API.
+- Treat `CliError`, `emit`, `run_cli`, `configure_logging`, `get_logger`,
+  `build_app` and `AliasGroup` as public API. `AliasGroup` is subclassed
+  downstream — `amr` extends it for sibling dispatch — so its `get_command`,
+  `invoke`, `shell_complete` and `list_commands` are an extension point, not
+  internals.
 - Do not add component-specific behaviour. Component CLIs should supply their
   own data; this toolkit supplies rendering and CLI mechanics.
 
@@ -44,5 +47,6 @@ uv run pyright
 uv run pytest
 ```
 
-When changing help output, table rendering, or logging defaults, also smoke test
-at least one downstream CLI from the meta repo after reinstalling the tool.
+When changing help output, completion, table rendering, or logging defaults,
+also smoke test at least one downstream CLI from the meta repo after
+reinstalling the tool.
