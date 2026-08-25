@@ -158,3 +158,55 @@ def test_completion_does_not_duplicate_a_subclass_extra_command() -> None:
 
     assert _completions(app, "") == ["list", "ls", "publish"]
     assert _completions(app, "pub") == ["publish"]
+
+
+def test_help_names_a_command_that_can_be_typed() -> None:
+    """Typer registers `"list | ls"` as the name; help must not print it back."""
+    app = build_app(cli_name="demo", version="0", version_command=False)
+
+    @app.command("list | ls")
+    def list_items() -> None:
+        """List the items."""
+
+    stdout = runner.invoke(app, ["--help"]).stdout
+    assert "list | ls" not in stdout
+    assert "list" in stdout
+
+
+def test_typo_suggests_a_command_that_can_be_typed() -> None:
+    """`Did you mean 'workspace | ws'?` is worse than no suggestion at all."""
+    app = build_app(cli_name="demo", version="0", version_command=False)
+
+    @app.command("workspace | ws")
+    def workspace() -> None:
+        """Do workspace things."""
+
+    result = runner.invoke(app, ["wrokspace"])
+    assert result.exit_code != 0
+    assert "workspace | ws" not in result.output
+    assert "Did you mean 'workspace'?" in result.output
+
+
+def test_a_mounted_sub_app_is_also_named_canonically() -> None:
+    app = build_app(cli_name="demo", version="0", version_command=False)
+    sub = typer.Typer()
+
+    @sub.command("run")
+    def sub_run() -> None: ...
+
+    app.add_typer(sub, name="harness | h")
+    stdout = runner.invoke(app, ["--help"]).stdout
+    assert "harness | h" not in stdout
+    assert runner.invoke(app, ["h", "run"]).exit_code == 0
+
+
+def test_registration_keys_still_carry_the_aliases() -> None:
+    """Consumers read the declared spellings off `commands`; resolution must not move them."""
+    app = build_app(cli_name="demo", version="0", version_command=False)
+
+    @app.command("list | ls")
+    def list_items() -> None: ...
+
+    group: Any = typer.main.get_command(app)
+    group.make_context("demo", [], resilient_parsing=True)  # after any canonicalisation
+    assert list(group.commands) == ["list | ls"]

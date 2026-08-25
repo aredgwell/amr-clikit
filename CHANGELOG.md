@@ -6,6 +6,33 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-08-25
+
+### Fixed
+
+- **`AliasGroup` no longer reports the declared string where a command name
+  belongs.** v0.4.x fixed resolution and completion but left `list_commands`
+  returning the registration key, so `@app.command("list | ls")` printed
+  `list | ls` in the help table and — worse — answered a typo with
+  `Did you mean 'workspace | ws'?`. That is a confident instruction that fails
+  when followed, which for an agent reading the output is worse than no
+  suggestion at all. `list_commands` now reports canonical names, commands are
+  named canonically so the rich help table agrees, and `resolve_command`
+  suggests one spelling at a time. Resolution and completion are unchanged:
+  either spelling still runs, and completion still offers both.
+
+  The registration keys are deliberately left alone — they are where the
+  aliases are declared, and a consumer reading the command tree reads them from
+  there.
+
+### Changed
+
+- The help table shows `list`, not `list | ls`, so a person reading `--help` no
+  longer sees the alias there. Putting it in the command's help text would put
+  alias text into the same attribute a structured reader takes as the help
+  string. Aliases remain discoverable through completion, which offers each
+  spelling as its own candidate.
+
 ## [0.4.1] - 2026-08-25
 
 ### Fixed

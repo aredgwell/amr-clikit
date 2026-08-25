@@ -51,6 +51,73 @@ class AliasGroup(TyperGroup):
     def get_command(self, ctx: Any, cmd_name: str) -> Any:
         return super().get_command(ctx, self._canonical(cmd_name))
 
+    def list_commands(self, ctx: Any) -> list[str]:
+        """Report the canonical name of each command, never the declared string.
+
+        Typer registers `@app.command("list | ls")` under the whole string, and
+        that string is what click reports back wherever it names a command: the
+        help table, the "did you mean" suggestion on a typo, the usage line. All
+        of those are places a caller is being told what to type, and
+        `Did you mean 'workspace | ws'?` is worse than no suggestion at all — an
+        agent will type it verbatim and it will fail.
+
+        Resolution is unaffected: `get_command` canonicalises, so either
+        spelling still works, and completion still offers both.
+        """
+        self._name_commands_canonically()
+        return [self._canonical_spelling(name) for name in super().list_commands(ctx)]
+
+    def _name_commands_canonically(self) -> None:
+        """Give each command its canonical name, once.
+
+        `list_commands` alone is not enough: Typer's rich help renders
+        `command.name`, not the name it was looked up by, so the declared string
+        would still reach the table. The registration key is deliberately left
+        as it is — it is where the aliases are declared, and a consumer reading
+        the tree reads them from there.
+
+        The trade-off, stated because it is a real one: the help table now shows
+        `list` rather than `list | ls`, so a person reading `--help` no longer
+        sees the alias. Appending it to the command's help would put alias text
+        into the same attribute that any structured reader takes as the help
+        string, which is the wrong place for it. Aliases stay discoverable
+        through completion, which offers each spelling separately.
+        """
+        for registered, command in self.commands.items():
+            canonical = self._canonical_spelling(registered)
+            if command.name != canonical:
+                command.name = canonical
+
+    def resolve_command(self, ctx: Any, args: list[str]) -> Any:
+        """Resolve a command, suggesting only spellings that would work.
+
+        Typer builds its "did you mean" from `self.commands.keys()` directly, so
+        a typo against `@app.command("workspace | ws")` answered
+        `Did you mean 'workspace | ws'?` — a confident instruction that fails
+        when followed. That is worse than no suggestion: an agent types it
+        verbatim.
+
+        Expanding the map to one entry per spelling for the length of the call
+        gives the suggestion real candidates to choose from, and gives them
+        individually rather than as one unusable string. The registration keys
+        are put back afterwards, because that is where the aliases are declared
+        and where a consumer reading the tree expects to find them.
+        """
+        registered = self.commands
+        self.commands = {
+            spelling: command
+            for name, command in registered.items()
+            for spelling in _ALIAS_SPLIT.split(name)
+        }
+        try:
+            return super().resolve_command(ctx, args)
+        finally:
+            self.commands = registered
+
+    @staticmethod
+    def _canonical_spelling(name: str) -> str:
+        return _ALIAS_SPLIT.split(name)[0]
+
     def invoke(self, ctx: Any) -> Any:
         """Invoke the chosen command, mapping `CliError` to its exit code.
 
@@ -80,15 +147,20 @@ class AliasGroup(TyperGroup):
         that is not a command.
 
         Asking the base class for the empty prefix yields one correctly-typed
-        item per visible command; each is then split into its aliases and
-        filtered by what the user has actually typed. Help and resolution are
-        untouched — only this method is narrowed.
+        item per visible command, named canonically; each is then offered under
+        every spelling it was declared with, filtered by what the user has
+        actually typed. Resolution is untouched — only this method is widened.
         """
+        spellings = {
+            self._canonical_spelling(name): _ALIAS_SPLIT.split(name) for name in self.commands
+        }
         candidates = [
-            type(item)(alias, type=item.type, help=item.help)
+            type(item)(spelling, type=item.type, help=item.help)
             for item in super().shell_complete(ctx, "")
-            for alias in _ALIAS_SPLIT.split(item.value)
-            if alias.startswith(incomplete)
+            # A subclass may list commands it does not register — a root group
+            # dispatching to siblings — and those have one spelling.
+            for spelling in spellings.get(item.value, [item.value])
+            if spelling.startswith(incomplete)
         ]
         # Options and anything else the base class offers for this prefix.
         # Everything the group *lists* is already covered above, under every
