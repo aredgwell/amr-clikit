@@ -15,7 +15,7 @@ def run_cli(entry: Callable[[], object]) -> None:
     - `KeyboardInterrupt` -> exit 130, quietly.
     - `SystemExit`      -> propagated unchanged (the framework's own exit).
     - any other error   -> exit 1; a one-line message, with the traceback only
-                           when logging is at DEBUG (i.e. `-v` was given).
+                           when logging is at DEBUG (i.e. `-vv` was given).
 
     Use as the console-script target, e.g. `def run() -> None: run_cli(app)`.
     """
@@ -33,5 +33,5 @@ def run_cli(entry: Callable[[], object]) -> None:
         if is_debug():
             log.error("unexpected error", exc_info=exc)
         else:
-            log.error("unexpected error", error=str(exc), hint="re-run with -v for a traceback")
+            log.error("unexpected error", error=str(exc), hint="re-run with -vv for a traceback")
         raise SystemExit(1) from None

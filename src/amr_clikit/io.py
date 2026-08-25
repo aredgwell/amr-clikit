@@ -25,6 +25,13 @@ def emit(data: Any, *, output: OutputFormat = "text", file: TextIO | None = None
       - any other list/tuple becomes one item per line;
       - a dict becomes `key: value` lines;
       - anything else is str()'d.
+
+    Table cells are single-line by contract. A value containing a newline is
+    not a cell: the second line starts at column zero and every column after it
+    is meaningless. Data that is multi-line by nature — captured tool output,
+    one line per package — wants its own sectioned rendering, not this table.
+    No column is padded past its last character, so rows carry no trailing
+    whitespace and copy cleanly.
     """
     stream = file or sys.stdout
     if output == "json":
@@ -78,9 +85,18 @@ def _as_table(rows: list[dict]) -> str:
                 headers.append(key)
     rendered = [{h: _cell(row.get(h)) for h in headers} for row in rows]
     widths = {h: max(len(h), *(len(r[h]) for r in rendered)) for h in headers}
-    lines = [
-        "  ".join(h.ljust(widths[h]) for h in headers),
-        "  ".join("-" * widths[h] for h in headers),
-        *("  ".join(r[h].ljust(widths[h]) for h in headers) for r in rendered),
-    ]
-    return "\n".join(lines)
+    last = headers[-1]
+
+    def _row(cells: dict[str, str]) -> str:
+        # The final column is not padded: padding it puts trailing whitespace on
+        # every header and every short last cell, which breaks copy-paste and
+        # shows up in diffs.
+        return "  ".join(cells[h] if h == last else cells[h].ljust(widths[h]) for h in headers)
+
+    return "\n".join(
+        [
+            _row({h: h for h in headers}),
+            _row({h: "-" * widths[h] for h in headers}),
+            *(_row(r) for r in rendered),
+        ]
+    )

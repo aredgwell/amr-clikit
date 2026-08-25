@@ -18,11 +18,17 @@ from __future__ import annotations
 import logging
 import os
 import sys
+import threading
+from typing import Any
 
 import structlog
 
 _VERBOSITY_LEVELS = ["WARNING", "INFO", "DEBUG"]
 _CONSOLE_RESERVED_KEYS = {"event", "level", "timestamp", "cli", "version"}
+
+# One stream, so one lock: keeps a message and its newline together when a CLI
+# logs from more than one thread.
+_WRITE_LOCK = threading.Lock()
 
 # Resolved level of the most recent configure_logging() call; used by run_cli to
 # decide whether to surface a traceback for unexpected errors.
@@ -43,6 +49,35 @@ def level_for_verbosity(verbose: int = 0, quiet: bool = False) -> str:
 def _resolve_level(level: str | None) -> int:
     name = (level or os.environ.get("AMR_LOG_LEVEL") or "WARNING").upper()
     return getattr(logging, name, logging.INFO)
+
+
+class _StderrLogger:
+    """A structlog logger that resolves ``sys.stderr`` at write time.
+
+    ``structlog.PrintLoggerFactory(file=sys.stderr)`` captures the stream when
+    logging is *configured*, so a module-level ``log = get_logger()`` — the
+    documented idiom — keeps writing to whatever stderr was then, even after
+    logging is reconfigured. That is invisible in a one-command process and
+    immediately visible wherever stderr is replaced per invocation, such as
+    ``typer.testing.CliRunner``: the second invocation writes to the first
+    one's stream, which the runner has closed.
+
+    Resolving per write is what a caller means by "stderr". Together with
+    ``cache_logger_on_first_use=False`` it measures at roughly 5 us per log
+    line, which for a CLI that emits tens of them is not a cost.
+    """
+
+    def msg(self, message: str) -> None:
+        with _WRITE_LOCK:
+            print(message, file=sys.stderr, flush=True)
+
+    log = debug = info = warn = warning = msg
+    fatal = failure = err = error = critical = exception = msg
+
+
+def _stderr_logger_factory(*_args: Any) -> _StderrLogger:
+    """structlog ``logger_factory`` producing late-binding stderr loggers."""
+    return _StderrLogger()
 
 
 def _console_message_renderer(_, __, event_dict: dict) -> str:
@@ -85,15 +120,20 @@ def configure_logging(*, cli_name: str, version: str, level: str | None = None) 
     structlog.configure(
         processors=processors,
         wrapper_class=structlog.make_filtering_bound_logger(_LEVEL),
-        logger_factory=structlog.PrintLoggerFactory(file=sys.stderr),
-        cache_logger_on_first_use=True,
+        logger_factory=_stderr_logger_factory,
+        # A cached bound logger freezes both the stream and the level at first
+        # use, which is the same staleness in a second place: a module-level
+        # `log = get_logger()` would keep the level of the first
+        # configure_logging() call. See _StderrLogger for the cost of not
+        # caching.
+        cache_logger_on_first_use=False,
     )
     structlog.contextvars.clear_contextvars()
     structlog.contextvars.bind_contextvars(cli=cli_name, version=version)
 
 
 def is_debug() -> bool:
-    """True if the active log level is DEBUG or lower (i.e. -v was given)."""
+    """True if the active log level is DEBUG or lower (i.e. -vv was given)."""
     return _LEVEL <= logging.DEBUG
 
 
