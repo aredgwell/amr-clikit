@@ -1,6 +1,6 @@
 [project]
 name = "amr-clikit"
-version = "0.5.0"
+version = "0.6.0"
 description = "Shared CLI toolkit: structured logging and stdout/stderr discipline for Python CLIs."
 readme = "README.md"
 requires-python = ">=3.12"

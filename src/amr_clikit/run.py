@@ -23,7 +23,11 @@ def run_cli(entry: Callable[[], object]) -> None:
     try:
         entry()
     except CliError as exc:
-        log.error(exc.message)
+        # `exit_code` on the record, not in the message: stderr is already JSON
+        # when it is not a TTY, so a caller capturing it can read the failure
+        # structurally rather than parsing prose. The console renderer reserves
+        # the key, so a person sees the message alone.
+        log.error(exc.message, exit_code=exc.exit_code)
         raise SystemExit(exc.exit_code) from None
     except KeyboardInterrupt:
         raise SystemExit(130) from None

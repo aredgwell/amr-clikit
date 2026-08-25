@@ -18,9 +18,9 @@ depends only on [structlog](https://www.structlog.org/).
 
 ```bash
 # core only
-uv add "amr-clikit @ git+https://github.com/aredgwell/amr-clikit.git@v0.5.0"
+uv add "amr-clikit @ git+https://github.com/aredgwell/amr-clikit.git@v0.6.0"
 # with the Typer glue (build_app + shared options)
-uv add "amr-clikit[typer] @ git+https://github.com/aredgwell/amr-clikit.git@v0.5.0"
+uv add "amr-clikit[typer] @ git+https://github.com/aredgwell/amr-clikit.git@v0.6.0"
 ```
 
 ## API
@@ -34,14 +34,14 @@ Core (no CLI-framework dependency):
 | `level_for_verbosity(verbose=0, quiet=False)` | Map `-v` count / `--quiet` to a level name. |
 | `emit(data, output="text"\|"json")` | Write a result to stdout. A list of dicts renders as an aligned table in text mode (single-line cells; no trailing whitespace). |
 | `confirm(prompt, assume_yes=False)` | Confirmation prompt; returns `False` in non-interactive contexts. |
-| `CliError(message, exit_code=1)` | Raise for expected, user-facing failures. |
+| `CliError(message, exit_code=1)` | Raise for expected, user-facing failures. `CliError.usage(message)` is the same thing with exit 2, for *you called this wrong*. |
 | `run_cli(entry)` | Run an entry point with the standard error/exit-code contract. |
 
 Typer glue (`amr_clikit.cli`, needs the `typer` extra):
-`build_app(cli_name, version, version_command=True)`, `AliasGroup`,
-`OUTPUT_OPTION`, `YES_OPTION`. Pass `version_command=False` to omit the
-`version` subcommand — `--version` stays — when something enumerates the
-command tree.
+`build_app(cli_name, version, version_command=True, commands_command=True)`,
+`command_tree(app)`, `AliasGroup`, `OUTPUT_OPTION`, `YES_OPTION`. Pass
+`version_command=False` or `commands_command=False` to omit either subcommand;
+`--version` stays either way.
 
 ## Usage
 
@@ -96,6 +96,64 @@ each alias as its own candidate (`list` and `ls`, not `list | ls`), and anywhere
 a command is *named back* to the caller — the help table, the usage line, the
 "did you mean" on a typo — it is named canonically, so what you are told to type
 is something that runs.
+
+### The command tree, as data
+
+The audience for a CLI on this workstation is often not a person. Every command
+here emits `--output json` on request — and so does the command surface itself:
+
+```console
+$ mycli commands --output json
+[{"command": "list", "aliases": ["ls"], "help": "List the items."}, ...]
+```
+
+`command` is the spelling to prefer and `aliases` is a separate list, so nothing
+puts a string like `list | ls` where a caller might type it. Sub-apps flatten to
+`"parent child"`, so a row is a complete invocation, and every combination of
+spellings that resolves is listed. It is derived from the live tree, so it
+cannot fall behind what the app offers.
+
+`build_app` registers it by default. To extend it — extra fields, or rows for
+commands that are not in the tree at all — pass `commands_command=False` and
+build on `command_tree(app)`:
+
+```python
+app = build_app(cli_name="mycli", version=__version__, commands_command=False)
+
+@app.command("commands")
+def commands(output: OutputFormat = OUTPUT_OPTION) -> None:
+    emit([{**row, "runs": "mycli"} for row in command_tree(app)], output=output)
+```
+
+### Is it agent-ready?
+
+`amr_clikit.testing.assert_agent_ready(app)` is one importable assertion to run
+against your own tree in your own suite:
+
+```python
+from amr_clikit.testing import assert_agent_ready
+from mycli.cli import app
+
+def test_the_cli_is_legible_to_an_agent() -> None:
+    assert_agent_ready(app)
+```
+
+It checks that every command's `--help` renders, that every alias `command_tree`
+publishes actually resolves, that every command taking `--output` produces
+parseable JSON, and that none of them writes its result anywhere but stdout.
+Pass `skip={"deploy"}` for commands that must not be run.
+
+### Exit codes
+
+`2` means *you called this wrong* — an argument that does not parse, a name that
+does not exist. `1` means *it ran, and found a problem*. The distinction is the
+one a caller deciding whether to retry needs: a `2` fails identically however
+many times it is repeated. `CliError.usage(message)` is the first case;
+`CliError(message)` defaults to the second.
+
+Diagnostics are already structured when stderr is not a TTY, so a caller
+capturing stderr reads a failure as JSON — including the `exit_code` — rather
+than parsing prose.
 
 ### Tables are single-line
 
