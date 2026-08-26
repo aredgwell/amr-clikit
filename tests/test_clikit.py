@@ -59,6 +59,13 @@ def test_emit_json_dict(capsys: pytest.CaptureFixture[str]) -> None:
     assert out.endswith("\n")
 
 
+def test_emit_agent_dict(capsys: pytest.CaptureFixture[str]) -> None:
+    emit({"b": 2, "a": 1}, output="agent")
+    out = capsys.readouterr().out
+    assert json.loads(out) == {"a": 1, "b": 2}
+    assert out == '{"a":1,"b":2}\n'
+
+
 def test_emit_text_list(capsys: pytest.CaptureFixture[str]) -> None:
     emit(["one", "two"], output="text")
     assert capsys.readouterr().out == "one\ntwo\n"

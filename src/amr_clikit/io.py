@@ -13,12 +13,13 @@ import sys
 from collections.abc import Sequence
 from typing import Any, Literal, TextIO
 
-OutputFormat = Literal["text", "json"]
+OutputFormat = Literal["text", "json", "agent"]
 
 
 def emit(data: Any, *, output: OutputFormat = "text", file: TextIO | None = None) -> None:
     """Write a command result to stdout.
 
+    output="agent": ultra-compact, whitespace-minimized deterministic JSON for LLM tool calls.
     output="json": compact, deterministic JSON (sorted keys) plus a newline.
     output="text": a human rendering —
       - a list of dicts becomes an aligned table (header + rows);
@@ -34,6 +35,10 @@ def emit(data: Any, *, output: OutputFormat = "text", file: TextIO | None = None
     whitespace and copy cleanly.
     """
     stream = file or sys.stdout
+    if output == "agent":
+        json.dump(data, stream, sort_keys=True, separators=(",", ":"), default=str)
+        stream.write("\n")
+        return
     if output == "json":
         json.dump(data, stream, sort_keys=True, default=str)
         stream.write("\n")

@@ -18,9 +18,9 @@ from amr_clikit.errors import CliError
 from amr_clikit.io import OutputFormat, emit
 from amr_clikit.log import configure_logging, get_logger, level_for_verbosity
 
-#: Reusable `--output text|json` option. Annotate the parameter with
+#: Reusable `--output text|json|agent` option. Annotate the parameter with
 #: `amr_clikit.OutputFormat`: `def cmd(output: OutputFormat = OUTPUT_OPTION)`.
-OUTPUT_OPTION = typer.Option("text", "--output", help="Output format: text or json.")
+OUTPUT_OPTION = typer.Option("text", "--output", help="Output format: text, json, or agent.")
 
 #: Reusable `--yes/-y` option to skip confirmation prompts; pass to `confirm`.
 YES_OPTION = typer.Option(False, "--yes", "-y", help="Skip confirmation prompts.")

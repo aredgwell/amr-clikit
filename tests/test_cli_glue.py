@@ -44,6 +44,12 @@ def test_command_honours_output_option() -> None:
     assert '"a": 1' in result.stdout
 
 
+def test_command_honours_agent_output_option() -> None:
+    result = runner.invoke(_make_app(), ["items", "--output", "agent"])
+    assert result.exit_code == 0
+    assert result.stdout == '[{"a":1}]\n'
+
+
 def test_command_alias_resolves() -> None:
     app = build_app(cli_name="demo", version="0")
 

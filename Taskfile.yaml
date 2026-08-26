@@ -1,0 +1,10 @@
+version: '3'
+
+tasks:
+  check:
+    desc: Run lint, formatting check, typecheck, and test suite
+    cmds:
+      - uv run --frozen ruff check .
+      - uv run --frozen ruff format --check .
+      - uv run --frozen pyright
+      - uv run --frozen pytest
