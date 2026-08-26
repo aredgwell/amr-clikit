@@ -258,7 +258,7 @@ def _tree_rows(command: Any, spellings: list[list[str]]) -> list[dict[str, objec
     # its own click internals, so a mounted sub-app is not an instance of the
     # public package's `Group` and the isinstance check silently returns False.
     children = getattr(command, "commands", None)
-    if not children:
+    if children is None:
         paths = [" ".join(parts) for parts in itertools.product(*spellings)]
         return [
             {

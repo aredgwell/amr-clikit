@@ -88,6 +88,8 @@ def _as_table(rows: list[dict]) -> str:
         for key in row:
             if key not in headers:
                 headers.append(key)
+    if not headers:
+        return ""
     rendered = [{h: _cell(row.get(h)) for h in headers} for row in rows]
     widths = {h: max(len(h), *(len(r[h]) for r in rendered)) for h in headers}
     last = headers[-1]

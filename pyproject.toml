@@ -3,7 +3,7 @@ name = "amr-clikit"
 version = "0.7.0"
 description = "Shared CLI toolkit: structured logging and stdout/stderr discipline for Python CLIs."
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.14"
 license = "MIT"
 license-files = ["LICENSE"]
 authors = [{ name = "Andrew Redgwell", email = "andrew@amr.nz" }]
@@ -11,8 +11,6 @@ keywords = ["cli", "logging", "structlog", "stdout", "stderr", "typer"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
-    "Programming Language :: Python :: 3.12",
-    "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
     "Topic :: Software Development :: Libraries",
     "Topic :: System :: Logging",
@@ -28,17 +26,12 @@ Repository = "https://github.com/aredgwell/amr-clikit"
 Issues = "https://github.com/aredgwell/amr-clikit/issues"
 
 [project.optional-dependencies]
-# Typer glue (amr_clikit.cli); the core needs no CLI framework.
-# typer>=0.19 is a floor, not a preference: `OutputFormat` is a `Literal`, and
-# Typer only began accepting `Literal` parameter types in 0.19.0. Earlier
-# versions raise `RuntimeError: Type not yet supported` when the app is built.
 typer = [
     "click>=8.1",
     "typer>=0.19",
 ]
 dev = [
     "click>=8.1",
-    # ruff>=0.16 is the generation whose formatter output this tree matches.
     "ruff>=0.16",
     "pyright>=1.1.380",
     "pytest>=8.0",
@@ -54,13 +47,10 @@ build-backend = "hatchling.build"
 packages = ["src/amr_clikit"]
 
 [tool.ruff]
-target-version = "py312"
+target-version = "py314"
 line-length = 100
 
 [tool.ruff.format]
-# Ruff 0.16 formats Python inside Markdown. The examples in README.md align
-# their trailing comments on purpose — the alignment is what makes the
-# stdout/stderr split readable at a glance — so prose is left to the writer.
 exclude = ["*.md"]
 
 [tool.ruff.lint]
@@ -68,7 +58,7 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 
 [tool.pyright]
 include = ["src", "tests"]
-pythonVersion = "3.12"
+pythonVersion = "3.14"
 typeCheckingMode = "standard"
 venvPath = "."
 venv = ".venv"

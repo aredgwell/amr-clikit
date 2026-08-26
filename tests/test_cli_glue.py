@@ -345,3 +345,39 @@ def test_assert_agent_ready_honours_skip() -> None:
         get_logger().error("nothing on stdout")
 
     assert_agent_ready(app, skip={"quiet"})
+
+
+def test_command_tree_ignores_empty_sub_app_and_hidden_commands() -> None:
+    app = build_app(cli_name="demo", version="1.0", version_command=False, commands_command=False)
+    empty_sub = typer.Typer()
+    app.add_typer(empty_sub, name="empty")
+
+    hidden_sub = typer.Typer()
+
+    @hidden_sub.command(hidden=True)
+    def secret() -> None: ...
+
+    app.add_typer(hidden_sub, name="secret")
+
+    @app.command("visible")
+    def visible() -> None: ...
+
+    rows = command_tree(app)
+    assert [row["command"] for row in rows] == ["visible"]
+
+
+def test_assert_agent_ready_skips_non_zero_exit_command() -> None:
+    app = build_app(cli_name="demo", version="1.0", version_command=False, commands_command=False)
+
+    @app.command()
+    def failing(output: OutputFormat = OUTPUT_OPTION) -> None:
+        raise CliError("failed check", exit_code=1)
+
+    assert_agent_ready(app)
+
+
+def test_testing_takes_output_option_handles_unresolved_command() -> None:
+    from amr_clikit.testing import _takes_output_option
+
+    app = build_app(cli_name="demo", version="1.0")
+    assert _takes_output_option(app, "does not exist") is False

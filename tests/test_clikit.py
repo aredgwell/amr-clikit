@@ -259,3 +259,58 @@ def test_console_logs_are_concise(monkeypatch: pytest.MonkeyPatch) -> None:
     configure_logging(cli_name="demo", version="1.2.3", level="INFO")
     get_logger().info("listing labs", count=0)
     assert err.getvalue() == "listing labs count=0\n"
+
+
+def test_console_logs_format_exception_on_newline(monkeypatch: pytest.MonkeyPatch) -> None:
+    class TtyStringIO(io.StringIO):
+        def isatty(self) -> bool:
+            return True
+
+    err = TtyStringIO()
+    monkeypatch.setattr(sys, "stderr", err)
+    configure_logging(cli_name="demo", version="1.2.3", level="DEBUG")
+    try:
+        raise ValueError("bad thing")
+    except ValueError as exc:
+        get_logger().error("failed operation", exc_info=exc)
+
+    output = err.getvalue()
+    lines = output.splitlines()
+    assert lines[0] == "failed operation"
+    assert "Traceback (most recent call last):" in output
+    assert "ValueError: bad thing" in output
+
+
+def test_emit_empty_dict_table(capsys: pytest.CaptureFixture[str]) -> None:
+    emit([{}], output="text")
+    assert capsys.readouterr().out == "\n"
+
+
+def test_emit_dict_with_none_and_collections(capsys: pytest.CaptureFixture[str]) -> None:
+    emit({"empty": None, "items": [1, 2], "tuple": ("a", "b")}, output="text")
+    assert capsys.readouterr().out == "empty: \nitems: 1, 2\ntuple: a, b\n"
+
+
+def test_confirm_interactive(monkeypatch: pytest.MonkeyPatch) -> None:
+    class InteractiveStdin(io.StringIO):
+        def isatty(self) -> bool:
+            return True
+
+    monkeypatch.setattr(sys, "stdin", InteractiveStdin("y\n"))
+    assert confirm("proceed?") is True
+
+    monkeypatch.setattr(sys, "stdin", InteractiveStdin("yes\n"))
+    assert confirm("proceed?") is True
+
+    monkeypatch.setattr(sys, "stdin", InteractiveStdin("n\n"))
+    assert confirm("proceed?") is False
+
+
+def test_run_cli_unexpected_error_debug_shows_traceback(capsys: pytest.CaptureFixture[str]) -> None:
+    configure_logging(cli_name="t", version="0", level="DEBUG")
+    with pytest.raises(SystemExit) as exit_info:
+        run_cli(_raise(RuntimeError("kaboom")))
+    assert exit_info.value.code == 1
+    err = capsys.readouterr().err
+    assert "unexpected error" in err
+    assert "Traceback" in err

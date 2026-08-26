@@ -6,7 +6,30 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-## [0.6.0] - 2026-08-25
+## [0.7.0] - 2026-08-27
+
+Standardising on Python 3.14, fixing output rendering edge cases, and refining
+console tracebacks and typing.
+
+### Added
+
+- Return type annotation for `get_logger()` (`-> structlog.stdlib.BoundLogger`).
+
+### Fixed
+
+- **`emit([{}])` no longer crashes with `IndexError`.** `_as_table` now guards
+  against empty headers when given rows with only empty dictionaries.
+- **Console traceback rendering in TTY mode.** Exception tracebacks now render
+  cleanly on a new line below the event message rather than formatted inline as
+  a `key=value` pair.
+- **Empty command groups omitted from `command_tree`.** `_tree_rows` now treats
+  only leaf commands (`children is None`) as runnable command rows, rather than
+  emitting empty sub-apps.
+
+### Changed
+
+- Minimum Python version raised to `requires-python = ">=3.14"`.
+- Upgraded dependencies (`click` 8.5.0, `structlog` 26.1.0).
 
 Making a CLI built here legible to an agent by default, rather than each
 consumer solving it separately.

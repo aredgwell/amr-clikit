@@ -88,9 +88,13 @@ def _console_message_renderer(_, __, event_dict: dict) -> str:
     details = [
         f"{key}={value}"
         for key, value in event_dict.items()
-        if key not in _CONSOLE_RESERVED_KEYS and value not in (None, "")
+        if key not in _CONSOLE_RESERVED_KEYS and key != "exception" and value not in (None, "")
     ]
-    return " ".join([event, *details]).strip()
+    message = " ".join([event, *details]).strip()
+    exc = event_dict.get("exception")
+    if exc:
+        return f"{message}\n{exc}" if message else str(exc)
+    return message
 
 
 def configure_logging(*, cli_name: str, version: str, level: str | None = None) -> None:
@@ -123,11 +127,6 @@ def configure_logging(*, cli_name: str, version: str, level: str | None = None) 
         processors=processors,
         wrapper_class=structlog.make_filtering_bound_logger(_LEVEL),
         logger_factory=_stderr_logger_factory,
-        # A cached bound logger freezes both the stream and the level at first
-        # use, which is the same staleness in a second place: a module-level
-        # `log = get_logger()` would keep the level of the first
-        # configure_logging() call. See _StderrLogger for the cost of not
-        # caching.
         cache_logger_on_first_use=False,
     )
     structlog.contextvars.clear_contextvars()
@@ -139,6 +138,6 @@ def is_debug() -> bool:
     return _LEVEL <= logging.DEBUG
 
 
-def get_logger(*args, **kwargs):
+def get_logger(*args: Any, **kwargs: Any) -> structlog.stdlib.BoundLogger:
     """Return a bound structlog logger. Thin pass-through for a single import site."""
     return structlog.get_logger(*args, **kwargs)
