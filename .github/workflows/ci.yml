@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -14,11 +15,13 @@ concurrency:
 
 jobs:
   check:
+    name: gate (py3.14)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10.0.1
+      - uses: astral-sh/setup-uv@v7
         with:
+          enable-cache: true
           python-version: "3.14"
       - run: uv sync --extra dev
       - run: uv run ruff check .
@@ -26,3 +29,11 @@ jobs:
       - run: uv run pyright
       - run: uv run pytest --cov=amr_clikit --cov-report=term-missing
       - run: uv build
+
+  actions:
+    name: workflow lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: actionlint
+        uses: raven-actions/actionlint@v2
