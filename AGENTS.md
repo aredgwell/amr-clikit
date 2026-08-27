@@ -2,6 +2,9 @@
 
 Instructions for agents working in this repository.
 
+`~/Code/amr/AGENTS.md` governs everything this file does not state. Where the
+two conflict, the root file wins.
+
 ## Purpose
 
 `amr-clikit` is the shared CLI toolkit for AMR Python CLIs. It owns the
