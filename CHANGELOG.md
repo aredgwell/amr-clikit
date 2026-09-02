@@ -6,6 +6,14 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **The CLI run journal (`~/.amr/runs.jsonl`) no longer grows unbounded.**
+  `run_cli` now caps it at 5 MiB, trimming to the newest half of lines once
+  exceeded.
+- README documented `emit()`'s `output` as `"text"|"json"` only; it now also
+  documents the shipped `"agent"` value.
+
 ## [0.7.0] - 2026-08-27
 
 Standardising on Python 3.14, fixing output rendering edge cases, and refining

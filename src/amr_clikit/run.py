@@ -14,6 +14,19 @@ from typing import Any
 from amr_clikit.errors import CliError
 from amr_clikit.log import get_logger, is_debug
 
+#: Cap on ~/.amr/runs.jsonl before it's trimmed to its newest half. Every
+#: amr-* invocation appends one line here forever otherwise; a size cap keeps
+#: passive telemetry from becoming an unbounded file no one prunes.
+_MAX_JOURNAL_BYTES = 5 * 1024 * 1024
+
+
+def _trim_journal(journal_file: Path) -> None:
+    """Halve `journal_file` by dropping its oldest lines once it's grown too big."""
+    if not journal_file.exists() or journal_file.stat().st_size < _MAX_JOURNAL_BYTES:
+        return
+    lines = journal_file.read_text(encoding="utf-8").splitlines()
+    journal_file.write_text("\n".join(lines[len(lines) // 2 :]) + "\n", encoding="utf-8")
+
 
 def _write_journal(record: dict[str, Any]) -> None:
     """Passively record run metadata to local journal (~/.amr/runs.jsonl).
@@ -26,6 +39,7 @@ def _write_journal(record: dict[str, Any]) -> None:
         journal_dir = Path.home() / ".amr"
         journal_dir.mkdir(parents=True, exist_ok=True)
         journal_file = journal_dir / "runs.jsonl"
+        _trim_journal(journal_file)
         with journal_file.open("a", encoding="utf-8") as f:
             f.write(json.dumps(record) + "\n")
     except Exception:

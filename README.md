@@ -32,7 +32,7 @@ Core (no CLI-framework dependency):
 | `configure_logging(cli_name, version, level=None)` | Configure logging once, in the root command. JSON when piped, concise console messages on a TTY; level from `level` / `AMR_LOG_LEVEL` / `WARNING`. |
 | `get_logger()` | A bound structlog logger (diagnostics → stderr). |
 | `level_for_verbosity(verbose=0, quiet=False)` | Map `-v` count / `--quiet` to a level name. |
-| `emit(data, output="text"\|"json")` | Write a result to stdout. A list of dicts renders as an aligned table in text mode (single-line cells; no trailing whitespace). |
+| `emit(data, output="text"\|"json"\|"agent")` | Write a result to stdout. A list of dicts renders as an aligned table in text mode (single-line cells; no trailing whitespace). `"json"` is compact, sorted-key JSON; `"agent"` is the same but whitespace-minimized, for LLM tool calls. |
 | `confirm(prompt, assume_yes=False)` | Confirmation prompt; returns `False` in non-interactive contexts. |
 | `CliError(message, exit_code=1)` | Raise for expected, user-facing failures. `CliError.usage(message)` is the same thing with exit 2, for *you called this wrong*. |
 | `run_cli(entry)` | Run an entry point with the standard error/exit-code contract. |
