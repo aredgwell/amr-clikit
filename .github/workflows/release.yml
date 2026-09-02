@@ -1,0 +1,100 @@
+# Tag and release whatever version pyproject.toml declares.
+#
+# Stated as an invariant rather than an event: *the declared version has a tag
+# and a release*. Every push to main checks it and does nothing when it already
+# holds, which is why there is no paths filter and no reliance on anyone
+# remembering a step.
+#
+# The alternative — trigger on a tag push — is what this repository already had
+# in effect, and it is how v0.7.0 came to be tagged with no release behind it.
+# A workflow that only runs when a human does the right thing does not remove
+# the step, it just moves where the omission shows up. Checking the invariant on
+# every push also backfills: a version released without a tag gets one the next
+# time anything lands.
+name: release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# Never cancel a half-finished release. A cancelled run can leave a pushed tag
+# with no release attached, which is the exact state this exists to prevent.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: tag and release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Tags are the state this job reads, and a shallow clone has none.
+          fetch-depth: 0
+
+      - name: read declared version
+        id: declared
+        run: |
+          version="$(python3 -c 'import tomllib,pathlib; print(tomllib.loads(pathlib.Path("pyproject.toml").read_text())["project"]["version"])')"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          if git rev-parse -q --verify "refs/tags/v${version}" >/dev/null; then
+            echo "The declared version v${version} is already tagged; nothing to release."
+            echo "needed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "needed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: astral-sh/setup-uv@v7
+        if: steps.declared.outputs.needed == 'true'
+        with:
+          enable-cache: true
+          python-version: "3.14"
+
+      - name: build the distribution
+        if: steps.declared.outputs.needed == 'true'
+        run: uv build
+
+      - name: extract the changelog entry
+        if: steps.declared.outputs.needed == 'true'
+        env:
+          VERSION: ${{ steps.declared.outputs.version }}
+        run: |
+          python3 - <<'PY' > release-notes.md
+          import os
+          import pathlib
+          import re
+
+          version = os.environ["VERSION"]
+          text = pathlib.Path("CHANGELOG.md").read_text(encoding="utf-8")
+          # The section runs from this version's heading to the next one. A
+          # missing section is not fatal: a release with a pointer to the file
+          # beats a failed release, and the CHANGELOG is where the detail lives
+          # either way.
+          match = re.search(
+              rf"^## \[{re.escape(version)}\].*?$(.*?)(?=^## \[|\Z)",
+              text,
+              re.MULTILINE | re.DOTALL,
+          )
+          body = match.group(1).strip() if match else ""
+          print(body or f"See CHANGELOG.md for {version}.")
+          PY
+
+      - name: tag and release
+        if: steps.declared.outputs.needed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.declared.outputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "v${VERSION}" -m "amr-clikit ${VERSION}"
+          git push origin "v${VERSION}"
+          gh release create "v${VERSION}" \
+            --title "v${VERSION}" \
+            --notes-file release-notes.md \
+            dist/*
