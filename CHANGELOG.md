@@ -4,7 +4,32 @@ All notable changes to amr-clikit are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.8.0] - 2026-09-03
+
+Deferring the structlog import so a command that never logs never pays for it.
+
+### Changed
+
+- **structlog is imported on first use, not on import of `amr_clikit`.** It
+  costs ~62 ms to import, and every `amr-*` command paid it whether or not it
+  logged anything — at the default `WARNING` level most commands log nothing on
+  the happy path. `configure_logging()` now records the decision in stdlib
+  state and the first log applies it. Measured 2026-09-03: `import amr_clikit`
+  122.8 ms → 62.2 ms, and end to end `import amr.cli` 218 ms → 179 ms,
+  `import amr_publish.cli` 253 ms → 205 ms.
+
+  `get_logger()` returns a proxy that resolves the real logger on first use, so
+  the documented `log = get_logger()` module-level idiom keeps working and keeps
+  the saving. It resolves per access rather than caching, which is the property
+  `cache_logger_on_first_use=False` and `_StderrLogger` already existed to give:
+  a logger obtained at import follows a later `configure_logging`.
+
+  One contract moves with it: structlog is configured process-wide at the first
+  `get_logger()` rather than at the `configure_logging()` call. A caller that
+  reaches for `structlog.get_logger()` directly, ahead of this module, now gets
+  structlog's defaults. `configure_logging()` applies immediately when structlog
+  is already in `sys.modules`, so this only affects a caller that bypasses
+  `get_logger()` entirely.
 
 ### Fixed
 

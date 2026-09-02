@@ -18,9 +18,9 @@ depends only on [structlog](https://www.structlog.org/).
 
 ```bash
 # core only
-uv add "amr-clikit @ git+https://github.com/aredgwell/amr-clikit.git@v0.7.0"
+uv add "amr-clikit @ git+https://github.com/aredgwell/amr-clikit.git@v0.8.0"
 # with the Typer glue (build_app + shared options)
-uv add "amr-clikit[typer] @ git+https://github.com/aredgwell/amr-clikit.git@v0.7.0"
+uv add "amr-clikit[typer] @ git+https://github.com/aredgwell/amr-clikit.git@v0.8.0"
 ```
 
 ## API
