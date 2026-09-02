@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 import json
+import subprocess
 import sys
 from collections.abc import Callable
 
@@ -247,6 +248,59 @@ def test_module_level_logger_follows_a_reconfigured_level(
     module_log.info("shown")
 
     assert [r["event"] for r in _log_records(capsys)] == ["shown"]
+
+
+def test_structlog_is_not_imported_by_a_cli_that_never_logs() -> None:
+    """The whole point of deferring it: importing the toolkit must not cost 62 ms.
+
+    Run in a subprocess because this one has structlog imported many times over
+    by the tests above, and `sys.modules` is process-wide.
+    """
+    script = (
+        "import sys\n"
+        "import amr_clikit\n"
+        "from amr_clikit import configure_logging\n"
+        "configure_logging(cli_name='t', version='0')\n"
+        "print('structlog' in sys.modules)\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", script], capture_output=True, text=True, check=True
+    )
+    assert result.stdout.strip() == "False"
+
+
+def test_a_module_level_logger_costs_nothing_until_it_logs() -> None:
+    """The idiom eight `amr` modules use must not drag structlog in at import."""
+    script = (
+        "import sys\n"
+        "from amr_clikit import configure_logging, get_logger\n"
+        "log = get_logger()\n"
+        "configure_logging(cli_name='t', version='0')\n"
+        "before = 'structlog' in sys.modules\n"
+        "log.warning('now')\n"
+        "print(before, 'structlog' in sys.modules)\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", script], capture_output=True, text=True, check=True
+    )
+    assert result.stdout.strip() == "False True"
+
+
+def test_a_cli_that_does_log_still_gets_the_configured_renderer() -> None:
+    """And the deferral is invisible to one that does: same JSON, same fields."""
+    script = (
+        "from amr_clikit import configure_logging, get_logger\n"
+        "configure_logging(cli_name='t', version='9.9', level='INFO')\n"
+        "get_logger().info('hello', n=1)\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", script], capture_output=True, text=True, check=True
+    )
+    record = json.loads(result.stderr.strip())
+    assert record["event"] == "hello"
+    assert record["cli"] == "t"
+    assert record["version"] == "9.9"
+    assert record["n"] == 1
 
 
 def test_console_logs_are_concise(monkeypatch: pytest.MonkeyPatch) -> None:

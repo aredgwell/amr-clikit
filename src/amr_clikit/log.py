@@ -11,6 +11,21 @@ One configuration, shared by every CLI:
 
 Each CLI calls `configure_logging(...)` once in its root command, then uses
 `get_logger()` anywhere.
+
+**structlog is imported on first use, not on import of this module.** It costs
+62 ms to import — measured 2026-09-03 against a 26 ms bare interpreter and a
+33 ms typer/click — and it is imported by every `amr-*` command whether or not
+that command logs anything. At the default WARNING level most do not: a routine
+`amr verify` or `amr-publish document build` emits nothing on the happy path.
+So `configure_logging` records the decision in stdlib state and `get_logger`
+applies it, which means a command that never logs never pays.
+
+The contract that changes with it, stated because it is a contract: structlog
+is process-wide configured at the first `get_logger()` rather than at the
+`configure_logging()` call. Anything reaching for `structlog.get_logger()`
+directly, ahead of this module, now gets structlog's defaults where it used to
+get this configuration. Nothing in the estate does — structlog appears in one
+file, this one — and `get_logger()` is the documented way in.
 """
 
 from __future__ import annotations
@@ -19,9 +34,10 @@ import logging
 import os
 import sys
 import threading
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 
-import structlog
+if TYPE_CHECKING:
+    import structlog
 
 _VERBOSITY_LEVELS = ["WARNING", "INFO", "DEBUG"]
 # `exit_code` is reserved rather than rendered: a structured reader wants it on
@@ -35,6 +51,13 @@ _WRITE_LOCK = threading.Lock()
 # Resolved level of the most recent configure_logging() call; used by run_cli to
 # decide whether to surface a traceback for unexpected errors.
 _LEVEL = logging.WARNING
+
+# What the most recent `configure_logging()` decided, held until something
+# actually logs. `None` means nothing has configured logging yet, in which case
+# `get_logger()` still works and structlog's own defaults apply — the same as
+# calling `get_logger()` before `configure_logging()` always did.
+_PENDING: dict[str, Any] | None = None
+_APPLIED = False
 
 
 def level_for_verbosity(verbose: int = 0, quiet: bool = False) -> str:
@@ -98,10 +121,46 @@ def _console_message_renderer(_, __, event_dict: dict) -> str:
 
 
 def configure_logging(*, cli_name: str, version: str, level: str | None = None) -> None:
-    """Configure structlog process-wide. Call once, in the root command."""
-    global _LEVEL
+    """Decide how this process will log. Call once, in the root command.
+
+    Applied at the first `get_logger()` rather than here, so a command that
+    emits nothing does not import structlog. Everything resolved eagerly is
+    resolved with the stdlib: the level, and whether stderr is a terminal.
+    `sys.stderr.isatty()` in particular is read *now* rather than at first log,
+    because the caller's stderr at root-callback time is what the renderer
+    choice has always been made against.
+    """
+    global _LEVEL, _PENDING, _APPLIED
     _LEVEL = _resolve_level(level)
-    use_json = not sys.stderr.isatty()
+    _PENDING = {
+        "cli_name": cli_name,
+        "version": version,
+        "level": _LEVEL,
+        "use_json": not sys.stderr.isatty(),
+    }
+    _APPLIED = False
+    # Deferral saves an *import*, so once structlog is imported there is nothing
+    # left to save and every reason not to wait: a caller holding a logger from
+    # a module-level `log = get_logger()` never calls `get_logger()` again, and
+    # would go on logging at the level this call just replaced. That idiom is
+    # documented above and `cache_logger_on_first_use=False` exists to serve it.
+    if "structlog" in sys.modules:
+        _apply()
+
+
+def _apply() -> None:
+    """Configure structlog from the pending decision, at most once per decision."""
+    global _APPLIED
+    if _APPLIED or _PENDING is None:
+        return
+    _APPLIED = True
+
+    import structlog
+
+    cli_name = _PENDING["cli_name"]
+    version = _PENDING["version"]
+    level = _PENDING["level"]
+    use_json = _PENDING["use_json"]
 
     processors: list = [structlog.contextvars.merge_contextvars]
     if use_json:
@@ -125,7 +184,7 @@ def configure_logging(*, cli_name: str, version: str, level: str | None = None) 
 
     structlog.configure(
         processors=processors,
-        wrapper_class=structlog.make_filtering_bound_logger(_LEVEL),
+        wrapper_class=structlog.make_filtering_bound_logger(level),
         logger_factory=_stderr_logger_factory,
         cache_logger_on_first_use=False,
     )
@@ -138,6 +197,43 @@ def is_debug() -> bool:
     return _LEVEL <= logging.DEBUG
 
 
+class _LazyLogger:
+    """Stands in for a structlog logger until something is actually logged.
+
+    `log = get_logger()` at module scope is the documented idiom, and eight
+    modules in `amr` alone use it. Returning a real logger there would import
+    structlog at *their* import and hand back the whole 62 ms this module
+    defers, so what comes back is this: an object that resolves the real logger
+    on the first attribute reached for, and not before.
+
+    It resolves on **every** access rather than caching one, which is the same
+    choice `_StderrLogger` makes about `sys.stderr` and for the same reason: a
+    logger obtained at import time must follow a later `configure_logging`,
+    not freeze the level and stream that were current when the module loaded.
+    `structlog.get_logger()` is a dictionary lookup and a bind, and this module
+    already accepts ~5 us per line for the same property.
+    """
+
+    __slots__ = ("_args", "_kwargs")
+
+    def __init__(self, args: tuple[Any, ...], kwargs: dict[str, Any]) -> None:
+        self._args = args
+        self._kwargs = kwargs
+
+    def __getattr__(self, name: str) -> Any:
+        _apply()
+
+        import structlog
+
+        return getattr(structlog.get_logger(*self._args, **self._kwargs), name)
+
+
 def get_logger(*args: Any, **kwargs: Any) -> structlog.stdlib.BoundLogger:
-    """Return a bound structlog logger. Thin pass-through for a single import site."""
-    return structlog.get_logger(*args, **kwargs)
+    """Return a bound structlog logger, deferring the import until it is used.
+
+    The return is a `_LazyLogger` standing in for the real one. It forwards
+    every attribute, so it is a `BoundLogger` in every way a caller can observe
+    — the annotation says what a caller may rely on, and `cast` is the only way
+    to say that about a proxy.
+    """
+    return cast("structlog.stdlib.BoundLogger", _LazyLogger(args, kwargs))
