@@ -37,3 +37,35 @@ jobs:
       - uses: actions/checkout@v7
       - name: actionlint
         uses: raven-actions/actionlint@v2
+
+  # Dependabot's patch and minor updates merge themselves once every other job
+  # here has passed. A major, or a release whose maintainers changed, waits for
+  # a person: those are the updates that need a decision rather than a glance.
+  # The 7-day cooldown in `dependabot.yml` is what keeps a freshly published,
+  # possibly compromised release from arriving this way at all.
+  #
+  # Merged with the workflow token because these repositories cannot carry
+  # branch protection, so there is no required check for `--auto` to wait on —
+  # `needs` is that wait. A token-made merge does not trigger `push`, so `main`'s
+  # own run is dispatched explicitly; without it the merged commit has no record.
+  automerge:
+    name: dependabot auto-merge
+    needs: [check, actions]
+    if: github.event_name == 'pull_request' && github.event.pull_request.user.login == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write
+    steps:
+      - id: metadata
+        uses: dependabot/fetch-metadata@v3
+      - name: merge, then run the gate on main
+        if: steps.metadata.outputs.update-type != 'version-update:semver-major' && steps.metadata.outputs.maintainer-changes != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: |
+          gh pr merge "$PR_URL" --merge --delete-branch
+          gh workflow run ci.yml --ref main --repo "$GITHUB_REPOSITORY"
