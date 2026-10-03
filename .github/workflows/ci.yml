@@ -10,8 +10,14 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  # Superseding a branch's own in-flight run is right — nobody wants the result
+  # of a commit that has already been replaced. `main` is the exception: its runs
+  # are the record of whether each published commit was green. A group per `main`
+  # commit, not merely `cancel-in-progress: false`, because GitHub still cancels a
+  # *pending* run when a newer one queues in the same group — on 2026-10-03 that
+  # hid a red amr-publish commit behind the push that followed it.
+  group: ci-${{ github.ref == 'refs/heads/main' && github.sha || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   check:
