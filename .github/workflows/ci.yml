@@ -66,6 +66,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PR_URL: ${{ github.event.pull_request.html_url }}
+          # The commit `needs` vouched for. Dependabot can push a rebase after
+          # the checks pass; without this the newer, unchecked head would merge.
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          gh pr merge "$PR_URL" --merge --delete-branch
+          gh pr merge "$PR_URL" --merge --delete-branch --match-head-commit "$HEAD_SHA"
           gh workflow run ci.yml --ref main --repo "$GITHUB_REPOSITORY"
